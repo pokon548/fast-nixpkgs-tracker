@@ -19,16 +19,27 @@ fn main() -> Result<(), Error> {
         Ok(val) => val,
         Err(_e) => panic!("Provide REDIS_URL to continue."),
     };
+    let github_token = match env::var("GITHUB_TOKEN") {
+        Ok(val) => val,
+        Err(_e) => {
+            println!(
+                "Warning: You do not provide GITHUB_TOKEN. You may experience rate limits from GitHub"
+            );
+            "".to_string()
+        }
+    };
     let port = match env::var("PORT") {
         Ok(val) => val,
         Err(_e) => "8080".to_string(),
-    }.parse::<u16>().unwrap();
+    }
+    .parse::<u16>()
+    .unwrap();
 
     ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
         .expect("Error setting Ctrl-C handler");
 
     let cloned_redis_url = redis_url.clone();
-    let handler = thread::spawn(move || server(cloned_redis_url, port));
+    let handler = thread::spawn(move || server(cloned_redis_url, port, github_token));
     let mut con = open_redis_connection(redis_url.clone()).unwrap().unwrap();
     let _ = set_index_state(&mut con, IndexState::Starting);
     println!("Trying to open existing git repo...");

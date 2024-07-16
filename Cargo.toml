@@ -15,3 +15,4 @@ serde_json = "1.0.120"
 clap = "4.5.9"
 signal-hook = { version = "0.3.4", features = ["extended-siginfo"] }
 ctrlc = "3.4"
+actix-cors = "0.7.0"
