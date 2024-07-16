@@ -16,3 +16,4 @@ clap = "4.5.9"
 signal-hook = { version = "0.3.4", features = ["extended-siginfo"] }
 ctrlc = "3.4"
 actix-cors = "0.7.0"
+jsonwebtoken = "9.3.0"

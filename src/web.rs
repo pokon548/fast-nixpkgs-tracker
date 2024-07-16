@@ -2,7 +2,7 @@ use std::{error::Error, sync::Mutex, time::Instant};
 
 use actix_cors::Cors;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
-use octocrab::models::IssueState;
+use octocrab::{models::IssueState, Octocrab};
 use redis::{Commands, Connection};
 use serde::Serialize;
 
@@ -21,7 +21,7 @@ struct PrStatusObj {
     pr: u64,
     commits: Vec<String>,
     included_branches: Vec<String>,
-    included_in: Vec<Vec<bool>>,
+    included_in: Vec<bool>,
     latest_commit: String,
     network_execution_time: String,
     redis_execution_time: String,
@@ -43,10 +43,14 @@ async fn get_pr_detail(data: web::Data<AppState>, pr: web::Path<u64>) -> impl Re
 
     if state.to_string().contains("READY") {
         let mut start = Instant::now();
-        let pr = octocrab::instance()
-            .pulls("NixOS", "nixpkgs")
-            .get(pr_number)
-            .await;
+        let octocrab = match github_token.len() > 0 {
+            true => Octocrab::builder()
+                .personal_token(github_token.to_string())
+                .build()
+                .unwrap(),
+            false => Octocrab::builder().build().unwrap(),
+        };
+        let pr = octocrab.pulls("NixOS", "nixpkgs").get(pr_number).await;
 
         if pr.is_ok() {
             let pr_value = pr.unwrap();
@@ -107,16 +111,20 @@ async fn get_pr_detail(data: web::Data<AppState>, pr: web::Path<u64>) -> impl Re
                                 for commit in commits {
                                     commits_vector.push(commit["sha"].clone().to_string());
                                 }
-                                let mut commit_exist_matrix: Vec<Vec<bool>> =
-                                    vec![vec![false; commits.len()]; CACHED_BRANCHES.len()];
+                                let mut commit_exist_matrix: Vec<bool> = vec![];
                                 for (pos, branch) in CACHED_BRANCHES.iter().enumerate() {
-                                    for (pos_inner, commit) in commits.iter().enumerate() {
+                                    let mut isFullyIncluded = true;
+                                    for (_pos_inner, commit) in commits.iter().enumerate() {
                                         let commit_sha1 =
                                             commit["sha"].clone().to_string().replace("\"", "");
-                                        commit_exist_matrix[pos][pos_inner] = con
+                                        let existence: bool = con
                                             .sismember(branch.to_uppercase(), commit_sha1)
                                             .unwrap();
+                                        if !existence {
+                                            isFullyIncluded = false
+                                        };
                                     }
+                                    commit_exist_matrix.push(isFullyIncluded);
                                 }
                                 let redis_duration = start.elapsed();
                                 let latest_commit: String = con.get("LAST_MASTER_COMMIT").unwrap();

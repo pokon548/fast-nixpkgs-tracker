@@ -1,7 +1,10 @@
 use git2::{Error, Repository};
 use redis::{Commands, Connection, RedisError, RedisResult};
 
-use crate::{config::{IndexState, CACHED_BRANCHES}, switch_branch, update_git_repo};
+use crate::{
+    config::{IndexState, CACHED_BRANCHES},
+    switch_branch, update_git_repo,
+};
 
 pub fn index_redis(repo: &Repository, con: &mut Connection) {
     println!("Indexing commits into redis database. It may take a while...");
@@ -36,7 +39,7 @@ pub fn write_cache_to_redis(
 ) -> Result<(), Error> {
     let mut revwalk = repo.revwalk()?;
     let mut latest_sha1: String = "".to_string();
-    revwalk.set_sorting(git2::Sort::TIME)?;
+    revwalk.set_sorting(git2::Sort::REVERSE)?;
     revwalk.push_head()?;
 
     if is_delta_update {
@@ -79,7 +82,10 @@ pub fn write_cache_to_redis(
 
 pub fn cache_commit_to_redis(repo: &Repository, con: &mut Connection) -> Result<(), RedisError> {
     for branch in &CACHED_BRANCHES {
-        let remote_branch_name = format!("origin/{}", branch);
+        let remote_branch_name = match branch {
+            &"master" => "master",
+            _ => &format!("origin/{}", branch),
+        };
         match switch_branch(&remote_branch_name, repo) {
             Ok(_) => {
                 println!("Indexing {} branch. Please wait.", branch);

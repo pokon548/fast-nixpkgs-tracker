@@ -668,6 +668,7 @@ dependencies = [
  "clap",
  "ctrlc",
  "git2",
+ "jsonwebtoken",
  "octocrab",
  "redis",
  "reqwest",
